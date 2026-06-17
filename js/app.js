@@ -338,12 +338,17 @@ function openDetail(id) {
   const c = couples.find(x => x.id === id);
   if (!c) return;
   detailCoupleId = id;
+  renderDetailModal(c);
+  document.getElementById('modal-detail').classList.remove('hidden');
+}
 
+function renderDetailModal(c) {
   document.getElementById('detail-title').textContent = `${c.him} & ${c.her}`;
 
   const cost = config.cost || 0;
-  const paid = c.amount || 0;
-  const pending = Math.max(0, cost - paid);
+  const payments = c.payments || [];
+  const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = Math.max(0, cost - totalPaid);
 
   const d = c.docs || {};
   const docItems = [
@@ -364,6 +369,28 @@ function openDetail(id) {
     `<div class="doc-log-item"><span class="log-time">${l.ts}</span> ${l.user} subió ${l.doc}</div>`
   ).join('') || '<div style="color:#aaa;font-size:12px;">Sin actividad</div>';
 
+  // Historial de pagos
+  let paymentsHTML = '';
+  if (payments.length === 0) {
+    paymentsHTML = '<div style="color:#aaa;font-size:13px;padding:8px 0;">Sin pagos registrados aún.</div>';
+  } else {
+    let acum = 0;
+    paymentsHTML = '<div class="payment-history">' +
+      payments.map((p, i) => {
+        acum += p.amount || 0;
+        return `<div class="payment-item">
+          <div class="payment-dot ${i === 0 ? 'first' : ''}"></div>
+          <div class="payment-info">
+            <div class="payment-amount">$${fmtMoney(p.amount)}</div>
+            <div class="payment-meta">${formatDate(p.date)} · Recibió: ${p.receivedBy || '—'}</div>
+            ${p.note ? `<div class="payment-note">"${p.note}"</div>` : ''}
+            <div class="payment-acum">Acumulado: $${fmtMoney(acum)}</div>
+          </div>
+        </div>`;
+      }).join('') +
+      '</div>';
+  }
+
   document.getElementById('detail-body').innerHTML = `
     <div class="section-label">Participantes</div>
     <div class="detail-row"><span class="detail-lbl">Él</span><span class="detail-val">${c.him}</span></div>
@@ -373,10 +400,14 @@ function openDetail(id) {
     <div class="detail-row"><span class="detail-lbl">Email él</span><span class="detail-val" style="font-size:12px">${c.emailHim || '—'}</span></div>
     <div class="detail-row"><span class="detail-lbl">Email ella</span><span class="detail-val" style="font-size:12px">${c.emailHer || '—'}</span></div>
 
-    <div class="section-label mt16">Pago</div>
-    <div class="detail-row"><span class="detail-lbl">Pagado</span><span class="detail-val" style="color:#1E7B3C">$${fmtMoney(paid)}</span></div>
-    <div class="detail-row"><span class="detail-lbl">Pendiente</span><span class="detail-val" style="color:#B06000">$${fmtMoney(pending)}</span></div>
-    <div class="detail-row"><span class="detail-lbl">Recibió</span><span class="detail-val">${c.receivedBy || '—'}</span></div>
+    <div class="section-label mt16">Resumen de pago</div>
+    <div class="detail-row"><span class="detail-lbl">Costo total</span><span class="detail-val">$${fmtMoney(cost)}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Total pagado</span><span class="detail-val" style="color:#1E7B3C">$${fmtMoney(totalPaid)}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Pendiente</span><span class="detail-val" style="color:${pending > 0 ? '#B06000' : '#1E7B3C'}">${pending > 0 ? '$'+fmtMoney(pending) : '✓ Liquidado'}</span></div>
+    <div class="detail-row"><span class="detail-lbl">No. de abonos</span><span class="detail-val">${payments.length}</span></div>
+
+    <div class="section-label mt16">Historial de abonos</div>
+    ${paymentsHTML}
 
     <div class="section-label mt16">Documentos</div>
     ${docRows}
@@ -390,10 +421,107 @@ function openDetail(id) {
     <div class="section-label mt16">Registro</div>
     <div class="detail-row"><span class="detail-lbl">Fecha registro</span><span class="detail-val">${formatDate(c.regDate)}</span></div>
     <div class="detail-row"><span class="detail-lbl">Evento</span><span class="detail-val">${c.eventDate || '—'}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Registrado por</span><span class="detail-val">${c.createdBy || '—'}</span></div>
+  `;
+}
+
+// ===== MODAL DE PAGO =====
+function openPaymentModal() {
+  const c = couples.find(x => x.id === detailCoupleId);
+  if (!c) return;
+
+  const cost = config.cost || 0;
+  const payments = c.payments || [];
+  const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const pending = Math.max(0, cost - totalPaid);
+
+  // Banner informativo
+  document.getElementById('pay-info-banner').innerHTML = `
+    <div class="pi-name">♡ ${c.him} & ${c.her}</div>
+    <div class="pi-row"><span class="pi-lbl">Total pagado</span><span class="pi-val green">$${fmtMoney(totalPaid)}</span></div>
+    <div class="pi-row"><span class="pi-lbl">Pendiente</span><span class="pi-val amber">$${fmtMoney(pending)}</span></div>
+    <div class="pi-row"><span class="pi-lbl">Abonos anteriores</span><span class="pi-val">${payments.length}</span></div>
   `;
 
-  document.getElementById('modal-detail').classList.remove('hidden');
+  // Reset campos
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pay-received-by').value = '';
+  document.getElementById('pay-note').value = '';
+  document.getElementById('pay-preview').classList.remove('visible');
+  document.getElementById('pay-preview').textContent = '';
+
+  closeModal('modal-detail');
+  document.getElementById('modal-payment').classList.remove('hidden');
 }
+
+function updatePaymentPreview() {
+  const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+  const c = couples.find(x => x.id === detailCoupleId);
+  if (!c || amount <= 0) {
+    document.getElementById('pay-preview').classList.remove('visible');
+    return;
+  }
+  const cost = config.cost || 0;
+  const payments = c.payments || [];
+  const totalPaid = payments.reduce((s, p) => s + (p.amount || 0), 0);
+  const newTotal = totalPaid + amount;
+  const newPending = Math.max(0, cost - newTotal);
+
+  const preview = document.getElementById('pay-preview');
+  preview.innerHTML = `Nuevo total pagado: <strong>$${fmtMoney(newTotal)}</strong> · Pendiente: <strong>$${fmtMoney(newPending)}</strong>${newPending === 0 ? ' ✓ ¡Liquidado!' : ''}`;
+  preview.classList.add('visible');
+}
+
+function savePayment() {
+  const amount = parseFloat(document.getElementById('pay-amount').value);
+  if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+
+  const date = document.getElementById('pay-date').value;
+  const receivedBy = document.getElementById('pay-received-by').value.trim();
+  const note = document.getElementById('pay-note').value.trim();
+
+  if (!date) { showToast('Selecciona la fecha del pago', 'error'); return; }
+  if (!receivedBy) { showToast('Indica quién recibió el pago', 'error'); return; }
+
+  const idx = couples.findIndex(c => c.id === detailCoupleId);
+  if (idx === -1) return;
+
+  if (!couples[idx].payments) couples[idx].payments = [];
+
+  const payment = {
+    id: 'P' + Date.now(),
+    coupleId: detailCoupleId,
+    amount,
+    date,
+    receivedBy,
+    note,
+    registeredBy: currentUser.name,
+    registeredAt: new Date().toISOString(),
+  };
+
+  couples[idx].payments.push(payment);
+
+  // Actualizar campo amount legacy para compatibilidad con el resto de la app
+  const totalPaid = couples[idx].payments.reduce((s, p) => s + (p.amount || 0), 0);
+  couples[idx].amount = totalPaid;
+
+  saveToStorage();
+  syncPaymentToSheets(payment, couples[idx]);
+
+  closeModal('modal-payment');
+
+  // Reabrir detalle actualizado
+  setTimeout(() => {
+    openDetail(detailCoupleId);
+    showToast('Abono registrado correctamente', 'success');
+  }, 200);
+
+  refreshDashboard();
+  renderCouples();
+  renderPayments();
+}
+
 
 function editCouple() {
   closeModal('modal-detail');
@@ -606,6 +734,36 @@ function saveUser() {
 }
 
 // ===== GOOGLE SHEETS SYNC =====
+async function syncPaymentToSheets(payment, couple) {
+  if (!config.scriptUrl) return;
+  try {
+    const totalPaid = (couple.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+    const cost = config.cost || 0;
+    const pending = Math.max(0, cost - totalPaid);
+    let payStatus = 'Sin pago';
+    if (cost > 0 && totalPaid >= cost) payStatus = 'Pagado';
+    else if (totalPaid > 0) payStatus = 'Parcial';
+
+    await fetch(config.scriptUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'savePayment',
+        payment: { ...payment },
+        coupleUpdate: {
+          id: couple.id,
+          totalPaid,
+          pending,
+          payStatus,
+          numPayments: couple.payments.length,
+        }
+      })
+    });
+  } catch (e) {
+    console.warn('Payment sync error:', e);
+  }
+}
 async function syncToSheets(couple) {
   if (!config.scriptUrl) return;
   try {
