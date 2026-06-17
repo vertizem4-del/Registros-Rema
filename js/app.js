@@ -130,11 +130,17 @@ function showApp() {
 
 // ===== NAVEGACIÓN =====
 function showView(view) {
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => {
+    v.classList.remove('active');
+    v.style.display = 'none';
+  });
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
   const viewEl = document.getElementById('view-' + view);
-  if (viewEl) viewEl.classList.add('active');
+  if (viewEl) {
+    viewEl.classList.add('active');
+    viewEl.style.display = 'block';
+  }
 
   const navEl = document.querySelector(`[data-view="${view}"]`);
   if (navEl) navEl.classList.add('active');
@@ -150,6 +156,9 @@ function showView(view) {
   document.getElementById('btn-new-couple').style.display = showPlus ? 'flex' : 'none';
 
   toggleSidebar(false);
+
+  // Scroll al inicio
+  window.scrollTo(0, 0);
 
   if (view === 'dashboard') refreshDashboard();
   if (view === 'couples') renderCouples();
