@@ -194,9 +194,18 @@ a { cursor: pointer; text-decoration: none; }
 .topbar-actions { display: flex; gap: 8px; }
 
 /* ===== CONTENT ===== */
-.content { padding: 16px; max-width: 600px; margin: 0 auto; }
+.content {
+  padding: 16px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+  overflow-y: auto;
+}
+
+/* ===== CONTENT ===== */
+.content { padding: 16px; max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
 .view { display: none; }
-.view.active { display: block; }
+.view.active { display: block; min-height: 200px; }
 .mt8 { margin-top: 8px; }
 .mt16 { margin-top: 16px; }
 
